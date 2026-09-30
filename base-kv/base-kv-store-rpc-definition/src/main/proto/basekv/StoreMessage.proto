@@ -1,0 +1,178 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+import "basekv/Type.proto";
+import "basekv/raft/ClusterConfig.proto";
+import "basekv/raft/RaftMessage.proto";
+import "basekv/raft/Snapshot.proto";
+import "basekv/Snapshot.proto";
+
+package basekv;
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.basekv.proto";
+option optimize_for = SPEED;
+
+message WALRaftMessages{
+  repeated raft.RaftMessage walMessages = 1;
+}
+
+message SnapshotSyncRequest{
+  string sessionId = 1;
+  KVRangeSnapshot snapshot = 2;
+}
+
+message DataMergeRequest{
+  string sessionId = 1;
+  KVRangeId mergerId = 2;
+}
+
+message KVPair{
+  bytes key = 1;
+  bytes value = 2;
+}
+
+message SaveSnapshotDataRequest{
+  string sessionId = 1;
+  uint32 reqId = 2;
+  enum Flag{
+    More = 0;
+    End = 1;
+    Error = 2;
+    NotFound = 3; // no range found
+  }
+  Flag flag = 3;
+  repeated KVPair kv = 4;
+}
+
+message SaveSnapshotDataReply{
+  string sessionId = 1;
+  uint32 reqId = 2;
+  enum Result{
+    OK = 0;
+    NoSessionFound = 1;
+    Retry = 2;
+    Error = 3;
+  }
+  Result result = 3;
+}
+
+message EnsureRange {
+  uint64 ver = 1;
+  basekv.Boundary boundary = 2;
+  raft.Snapshot initSnapshot = 3;
+}
+
+message EnsureRangeReply {
+  enum Result{
+    OK = 0;
+    Error = 1;
+  }
+  Result result = 1;
+}
+
+message PrepareMergeToRequest{
+  string taskId = 1;
+  basekv.KVRangeId id = 2; // merger's id
+  uint64 ver = 3; // merger's ver
+  raft.ClusterConfig config = 4; // merger's config at the moment
+  basekv.Boundary boundary = 5; // merger's boundary at the moment
+}
+
+message PrepareMergeToReply{
+  string taskId = 1;
+  optional bool accept = 2; // null means no mergee found, true means accepted, false means rejected and needs retry
+}
+
+message MergeRequest{
+  string taskId = 1;
+  uint64 ver = 2;
+  basekv.KVRangeId mergeeId = 3;
+  uint64 mergeeVer = 4;
+  basekv.Boundary boundary = 5;
+  string storeId = 6;
+  raft.ClusterConfig config = 7; // mergee's config at the moment
+}
+
+message MergeReply{
+  string taskId = 1;
+  optional bool accept = 2; // null means no merger found, true means accepted, false means rejected and needs retry
+}
+
+message MergeDoneRequest{
+  string taskId = 1;
+  basekv.KVRangeId id = 3; // merger's id
+  uint64 mergeeVer = 4;
+  string storeId = 5;
+}
+
+message MergeDoneReply{
+  string taskId = 1;
+  optional bool accept = 2; // null means no mergee found, true means accepted, false means rejected and needs retry
+}
+
+message CancelMergingRequest{
+  string taskId = 1;
+  uint64 ver = 2;
+  uint32 reasonCode = 3;
+  KVRangeId requester = 4;
+}
+
+message CancelMergingReply{
+  string taskId = 1;
+  optional bool accept = 2; // null means no merger/mergee found, true means accepted, false means rejected and needs retry
+}
+
+message MergeHelpRequest{
+  string taskId = 1;
+  basekv.KVRangeId mergeeId = 2;
+  uint64 ver = 3;
+  basekv.Boundary boundary = 4;
+  raft.ClusterConfig config = 5;
+}
+
+// used for both direction
+message KVRangeMessage{
+  optional KVRangeId rangeId = 1; // send direction: the target rangeId or null for broadcast; recv direction: the source rangeId
+  optional string hostStoreId = 2; // send direction: the target store, or null for broadcast; recv direction: the source storeId
+  oneof PayloadType{
+    WALRaftMessages walRaftMessages = 4;
+    SnapshotSyncRequest snapshotSyncRequest = 5;
+    SaveSnapshotDataRequest saveSnapshotDataRequest = 6;
+    SaveSnapshotDataReply saveSnapshotDataReply = 7;
+    EnsureRange ensureRange = 8;
+    EnsureRangeReply ensureRangeReply = 9;
+    PrepareMergeToRequest prepareMergeToRequest = 10;
+    PrepareMergeToReply prepareMergeToReply = 11;
+    MergeRequest mergeRequest = 12;
+    MergeReply mergeReply = 13;
+    CancelMergingRequest cancelMergingRequest = 14;
+    CancelMergingReply cancelMergingReply = 15;
+    MergeDoneRequest mergeDoneRequest = 16;
+    MergeDoneReply mergeDoneReply = 17;
+    DataMergeRequest dataMergeRequest = 18;
+    MergeHelpRequest mergeHelpRequest = 19;
+  }
+}
+
+message StoreMessage {
+  string from = 1;
+  KVRangeId srcRange = 3;
+  KVRangeMessage payload = 5;
+}

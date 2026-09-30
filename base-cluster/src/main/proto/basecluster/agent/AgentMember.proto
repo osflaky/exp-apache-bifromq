@@ -1,0 +1,48 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+import "basecluster/membership/HostMember.proto";
+
+package basecluster.agent;
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.basecluster.agent.proto";
+option optimize_for = SPEED;
+
+message AgentEndpoint {
+  basecluster.membership.HostEndpoint endpoint = 1;
+  uint64 incarnation = 2; // the incarnation of the agent endpoint
+}
+
+message AgentMemberAddr {
+  string name = 1; // the name of the agent member, it's allowed to have same name registered in different hosts
+  basecluster.membership.HostEndpoint endpoint = 2;
+  uint64 incarnation = 3; // the incarnation of hosted agent endpoint
+}
+
+message AgentMemberMetadata {
+  uint64 hlc = 1;
+  bytes value = 2; // the metadata binary associated
+}
+
+message AgentMember {
+  AgentMemberAddr addr = 1; // the address of the agent member
+  AgentMemberMetadata metadata = 2;
+}
+

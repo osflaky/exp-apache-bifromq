@@ -1,0 +1,91 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+import "commontype/ClientInfo.proto";
+import "commontype/MatchInfo.proto";
+import "commontype/TopicMessage.proto";
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.retain.rpc.proto";
+option java_outer_classname = "RetainServiceProtos";
+
+package retainservice;
+
+service RetainService {
+  rpc retain (RetainRequest) returns (RetainReply);
+  rpc match (MatchRequest) returns (MatchReply);
+  rpc expireAll (ExpireAllRequest) returns (ExpireAllReply);
+}
+
+message RetainRequest {
+  uint64 reqId = 1; // message id
+  string topic = 2;
+  commontype.Message message = 3;
+  commontype.ClientInfo publisher = 4;
+}
+
+message RetainReply {
+  enum Result {
+    RETAINED = 0;
+    CLEARED = 1;
+    EXCEED_LIMIT = 2; // exceed max retained topic quota
+    BACK_PRESSURE_REJECTED = 3;
+    TRY_LATER = 4;
+    ERROR = 5;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+}
+
+message MatchRequest {
+  uint64 reqId = 1;
+  string tenantId = 2;
+  commontype.MatchInfo matchInfo = 3;
+  string delivererKey = 4;
+  uint32 brokerId = 5;
+  uint32 limit = 6;
+}
+
+message MatchReply {
+  enum Result {
+    OK = 0;
+    BACK_PRESSURE_REJECTED = 1;
+    TRY_LATER = 2;
+    ERROR = 3;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+}
+
+message ExpireAllRequest{
+  uint64 reqId = 1;
+  string tenantId = 2;
+  optional uint32 expirySeconds = 3;
+  uint64 now = 4;
+}
+
+message ExpireAllReply{
+  enum Result {
+    OK = 0;
+    TRY_LATER = 1;
+    ERROR = 2;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+}

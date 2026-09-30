@@ -1,0 +1,81 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+import "commontype/UserProperties.proto";
+import "commontype/QoS.proto";
+
+package checktypes;
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.plugin.authprovider.type";
+option java_outer_classname = "CheckTypesProto";
+option optimize_for = SPEED;
+
+message PubAction {
+  string topic = 1;
+  commontype.QoS qos = 2;
+  bool isRetained = 3;
+  commontype.UserProperties userProps = 4;
+}
+
+message SubAction {
+  string topicFilter = 1;
+  commontype.QoS qos = 2;
+  commontype.UserProperties userProps = 5;
+}
+
+message UnsubAction {
+  string topicFilter = 1;
+  commontype.UserProperties userProps = 2;
+}
+
+message ConnAction {
+  commontype.UserProperties userProps = 1;
+}
+
+message MQTTAction {
+  oneof Type{
+    PubAction pub = 1;
+    SubAction sub = 2;
+    UnsubAction unsub = 3;
+    ConnAction conn = 4;
+  }
+}
+
+message Granted{
+  commontype.UserProperties userProps = 1; // user properties return back via mqtt5 pubAck/pubRel
+}
+
+message Denied{
+  optional string reason = 1;
+  commontype.UserProperties userProps = 2; // user properties return back via mqtt5 pubAck/pubRel or disconnect in case QoS0
+}
+
+message Error{
+  optional string reason = 1;
+  commontype.UserProperties userProps = 2; // user properties return back via mqtt5 pubAck/pubRel or disconnect in case QoS0
+}
+
+message CheckResult {
+  oneof Type{
+    Granted granted = 1;
+    Denied denied = 2;
+    Error error = 3;
+  }
+}

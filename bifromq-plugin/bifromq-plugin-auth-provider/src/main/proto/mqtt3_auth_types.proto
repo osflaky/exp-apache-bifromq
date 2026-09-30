@@ -1,0 +1,62 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+
+package mqtt3authtypes;
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.plugin.authprovider.type";
+option java_outer_classname = "MQTT3AuthTypesProto";
+option optimize_for = SPEED;
+
+message MQTT3AuthData{
+  bool isMQIsdp = 1; // MQIsdp is MQTT 3.1
+  optional string username = 2;
+  optional bytes password = 3;
+  optional bytes cert = 4;
+  optional string clientId = 5;
+  string remoteAddr = 6;
+  uint32 remotePort = 7;
+  string channelId = 8;
+}
+
+message Ok{
+  string tenantId = 1;
+  string userId = 2;
+  map<string, string> attrs = 3; // additional attributes filled by auth provider plugin which will be copied to ClientInfo
+}
+
+message Reject{
+  enum Code {
+    BadPass = 0;
+    NotAuthorized = 1;
+    Error = 2;
+  }
+  Code code = 1;
+  optional string tenantId = 2; // optional if tenant can be determined
+  optional string userId = 3; // optional if user can be determined
+  optional string reason = 4; // optional description
+}
+
+message MQTT3AuthResult {
+  oneof Type{
+    Ok ok = 1;
+    Reject reject = 2;
+  }
+}

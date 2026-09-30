@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one
+  ~ or more contributor license agreements.  See the NOTICE file
+  ~ distributed with this work for additional information
+  ~ regarding copyright ownership.  The ASF licenses this file
+  ~ to you under the Apache License, Version 2.0 (the
+  ~ "License"); you may not use this file except in compliance
+  ~ with the License.  You may obtain a copy of the License at
+  ~
+  ~   http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an
+  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  ~ KIND, either express or implied.  See the License for the
+  ~ specific language governing permissions and limitations
+  ~ under the License.
+  -->
+
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.apache.bifromq</groupId>
+        <artifactId>bifromq-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>bifromq-apiserver</artifactId>
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>base-cluster</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>base-util</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>base-kv-meta-service</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>base-hlc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>bifromq-util</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>bifromq-dist-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>bifromq-session-dict-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>bifromq-inbox-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>bifromq-retain-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.bifromq</groupId>
+            <artifactId>bifromq-plugin-setting-provider</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java-util</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-core-jakarta</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-jaxrs2-jakarta</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- test dependencies -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j2-impl</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.swagger.core.v3</groupId>
+                <artifactId>swagger-maven-plugin-jakarta</artifactId>
+                <version>${swagger.version}</version>
+                <configuration>
+                    <outputPath>${project.build.directory}/swagger</outputPath>
+                    <outputFileName>BifroMQ-API</outputFileName>
+                    <outputFormat>YAML</outputFormat>
+                    <resourcePackages>
+                        <package>org.apache.bifromq.apiserver.http.handler</package>
+                    </resourcePackages>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>resolve</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>filter-swagger-resources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${build.output.dir}/site/swagger</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.build.directory}/swagger</directory>
+                                    <filtering>true</filtering> <!-- filter placeholder -->
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

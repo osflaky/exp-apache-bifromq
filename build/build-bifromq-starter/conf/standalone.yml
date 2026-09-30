@@ -1,0 +1,56 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# This configuration file contains overrides for the default values of available configuration options.
+# Please note that configuration options in different versions of BifroMQ may change.
+# Once the BifroMQ service process is started, the consolidated configuration will be output in the info.log,
+# providing a helpful reference for writing and customizing this file.
+
+# Enabling custom auth provider, specify the Fully Qualified Name of the auth provider class from your plugin.
+# or experiment with the built-in auth provider which is a simple webhook based implementation.
+# authProviderFQN: "org.apache.bifromq.demo.plugin.DemoAuthProvider"
+
+# Enabling runtime throttling at tenant-level, specify the Fully Qualified Name of the resource throttler class from your plugin.
+# or experiment with the built-in resource throttler which is a simple webhook based implementation.
+# resourceThrottlerFQN: "org.apache.bifromq.demo.plugin.DemoResourceThrottler"
+
+# Enabling runtime setting at tenant-level, specify the Fully Qualified Name of the setting provider class from your plugin.
+# or experiment with the built-in setting provider which is a simple webhook based implementation.
+# settingProviderFQN: "org.apache.bifromq.demo.plugin.DemoSettingProvider"
+
+# Process-level metrics tags applied to all metrics in this process
+metricsTags:
+  env: Test
+
+mqttServiceConfig:
+  server:
+    tcpListener:
+      port: 1883
+
+# config for building BifroMQ cluster
+clusterConfig:
+  # The environment of the cluster, cluster member under same env can communicate with each other
+  env: "Test"
+  # The host address to bind for inter-member communication. If left blank, a site-local address will be used if available
+  host:
+  # This is the port for listening to cluster membership-related messages. If left blank, the operating system will help find an available one automatically.
+  # For seed nodes, it is recommended to specify an explicit port number to simplify the cluster building process.
+  port:
+  # Optionally using DNS to achieve cluster member address discovery
+  clusterDomainName:
+  # comma separated list of <ADDRESS>:<PORT> for joining the cluster
+  seedEndpoints:

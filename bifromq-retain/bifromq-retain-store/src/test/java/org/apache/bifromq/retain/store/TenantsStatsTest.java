@@ -1,0 +1,116 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.bifromq.retain.store;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.Optional;
+import java.util.function.Supplier;
+import org.apache.bifromq.basekv.store.api.IKVRangeRefreshableReader;
+import org.apache.bifromq.metrics.ITenantMeter;
+import org.apache.bifromq.metrics.TenantMetric;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+
+public class TenantsStatsTest {
+    String tenantId = "tenant-" + System.nanoTime();
+    private SimpleMeterRegistry meterRegistry;
+    private IKVRangeRefreshableReader reader;
+    private Supplier<IKVRangeRefreshableReader> readerSupplier;
+
+
+    @BeforeMethod
+    public void setup() {
+        reader = mock(IKVRangeRefreshableReader.class);
+        readerSupplier = mock(Supplier.class);
+        when(readerSupplier.get()).thenReturn(reader);
+        meterRegistry = new SimpleMeterRegistry();
+        Metrics.globalRegistry.add(meterRegistry);
+    }
+
+    @AfterMethod
+    public void tearDown() {
+        Metrics.globalRegistry.getMeters().forEach(Metrics.globalRegistry::remove);
+        Metrics.globalRegistry.remove(meterRegistry);
+    }
+
+    @Test
+    public void increaseTopicCount() {
+        TenantsStats tenantsStats = new TenantsStats(readerSupplier);
+        assertNoGauge(tenantId, TenantMetric.MqttRetainNumGauge);
+        assertNoGauge(tenantId, TenantMetric.MqttRetainSpaceGauge);
+        tenantsStats.increaseTopicCount(tenantId, 1);
+        tenantsStats.toggleMetering(true);
+        assertGauge(tenantId, TenantMetric.MqttRetainNumGauge);
+        assertGauge(tenantId, TenantMetric.MqttRetainSpaceGauge);
+    }
+
+    @Test
+    public void decreaseTopicCount() {
+        TenantsStats tenantsStats = new TenantsStats(readerSupplier);
+        tenantsStats.increaseTopicCount(tenantId, 1);
+        tenantsStats.toggleMetering(true);
+        assertGauge(tenantId, TenantMetric.MqttRetainNumGauge);
+        assertGauge(tenantId, TenantMetric.MqttRetainSpaceGauge);
+
+        tenantsStats.increaseTopicCount(tenantId, -1);
+
+        assertNoGauge(tenantId, TenantMetric.MqttRetainNumGauge);
+        assertNoGauge(tenantId, TenantMetric.MqttRetainSpaceGauge);
+    }
+
+    @Test
+    public void close() {
+        TenantsStats tenantsStats = new TenantsStats(readerSupplier);
+        tenantsStats.increaseTopicCount(tenantId, 1);
+        tenantsStats.toggleMetering(true);
+        assertGauge(tenantId, TenantMetric.MqttRetainNumGauge);
+        assertGauge(tenantId, TenantMetric.MqttRetainSpaceGauge);
+
+        tenantsStats.close();
+        assertNoGauge(tenantId, TenantMetric.MqttRetainNumGauge);
+        assertNoGauge(tenantId, TenantMetric.MqttRetainSpaceGauge);
+    }
+
+    private void assertGauge(String tenantId, TenantMetric tenantMetric) {
+        Optional<Meter> gauge = getGauge(tenantId, tenantMetric);
+        assertTrue(gauge.isPresent());
+        assertEquals(gauge.get().getId().getType(), Meter.Type.GAUGE);
+        assertEquals(gauge.get().getId().getTag(ITenantMeter.TAG_TENANT_ID), tenantId);
+    }
+
+    private void assertNoGauge(String tenantId, TenantMetric tenantMetric) {
+        Optional<Meter> gauge = getGauge(tenantId, tenantMetric);
+        gauge.ifPresent(meter -> assertEquals(meter.getId().getTag(ITenantMeter.TAG_TENANT_ID), tenantId));
+    }
+
+    private Optional<Meter> getGauge(String tenantId, TenantMetric tenantMetric) {
+        return meterRegistry.getMeters().stream()
+            .filter(m -> m.getId().getName().equals(tenantMetric.metricName)
+                && tenantId.equals(m.getId().getTag(ITenantMeter.TAG_TENANT_ID))).findFirst();
+    }
+}

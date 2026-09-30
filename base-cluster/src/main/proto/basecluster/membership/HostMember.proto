@@ -1,0 +1,39 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+
+package basecluster.membership;
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.basecluster.membership.proto";
+option optimize_for = SPEED;
+
+message HostEndpoint{
+  bytes id = 1; // the id of the host member which is identical to the replica id of local HostMemberListCRDT
+  string address = 3; // the network address of the host
+  uint32 port = 4; // bind network port of the host
+  uint64 pid = 5; // the pid of the host process
+}
+
+message HostMember {
+  HostEndpoint endpoint = 1;
+  uint32 incarnation = 2; // incarnation of the node, managed by the node itself
+  //repeated string agentId = 3; deprecate since 3.3.3, the list of agents reside on the host
+  map<string, uint64> agent = 4; // the map of agent id to incarnation
+}

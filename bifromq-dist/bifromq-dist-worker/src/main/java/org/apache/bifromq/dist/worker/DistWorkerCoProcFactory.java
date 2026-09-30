@@ -1,0 +1,105 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.bifromq.dist.worker;
+
+import com.google.common.util.concurrent.MoreExecutors;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.bifromq.basekv.proto.KVRangeId;
+import org.apache.bifromq.basekv.store.api.IKVRangeCoProc;
+import org.apache.bifromq.basekv.store.api.IKVRangeCoProcFactory;
+import org.apache.bifromq.basekv.store.api.IKVRangeRefreshableReader;
+import org.apache.bifromq.basekv.utils.KVRangeIdUtil;
+import org.apache.bifromq.deliverer.IMessageDeliverer;
+import org.apache.bifromq.dist.client.IDistClient;
+import org.apache.bifromq.dist.worker.cache.ISubscriptionCache;
+import org.apache.bifromq.dist.worker.cache.SubscriptionCache;
+import org.apache.bifromq.plugin.eventcollector.IEventCollector;
+import org.apache.bifromq.plugin.resourcethrottler.IResourceThrottler;
+import org.apache.bifromq.plugin.settingprovider.ISettingProvider;
+import org.apache.bifromq.plugin.subbroker.ISubBrokerManager;
+import org.apache.bifromq.sysprops.props.DistMatchParallelism;
+
+@Slf4j
+public class DistWorkerCoProcFactory implements IKVRangeCoProcFactory {
+    private final IEventCollector eventCollector;
+    private final IResourceThrottler resourceThrottler;
+    private final IMessageDeliverer deliverer;
+    private final ISettingProvider settingProvider;
+    private final ISubscriptionCleaner subscriptionChecker;
+    private final ExecutorService matchExecutor;
+    private final int fanoutParallelism;
+    private final int inlineFanOutThreshold;
+
+    public DistWorkerCoProcFactory(IDistClient distClient,
+                                   IEventCollector eventCollector,
+                                   IResourceThrottler resourceThrottler,
+                                   ISubBrokerManager subBrokerManager,
+                                   IMessageDeliverer messageDeliverer,
+                                   ISettingProvider settingProvider,
+                                   int fanoutParallelism,
+                                   int inlineFanOutThreshold) {
+        this.eventCollector = eventCollector;
+        this.resourceThrottler = resourceThrottler;
+        this.deliverer = messageDeliverer;
+        this.settingProvider = settingProvider;
+        this.fanoutParallelism = fanoutParallelism;
+        this.inlineFanOutThreshold = inlineFanOutThreshold;
+        subscriptionChecker = new SubscriptionCleaner(subBrokerManager, distClient);
+
+        matchExecutor = ExecutorServiceMetrics.monitor(Metrics.globalRegistry,
+            new ForkJoinPool(DistMatchParallelism.INSTANCE.get(), new ForkJoinPool.ForkJoinWorkerThreadFactory() {
+                final AtomicInteger index = new AtomicInteger(0);
+
+                @Override
+                public ForkJoinWorkerThread newThread(ForkJoinPool pool) {
+                    ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+                    worker.setName(String.format("topic-matcher-%d", index.incrementAndGet()));
+                    worker.setDaemon(false);
+                    return worker;
+                }
+            }, null, false), "topic-matcher");
+    }
+
+    @Override
+    public IKVRangeCoProc createCoProc(String clusterId, String storeId, KVRangeId id,
+                                       Supplier<IKVRangeRefreshableReader> rangeReaderProvider) {
+        ISubscriptionCache routeCache = new SubscriptionCache(id, rangeReaderProvider,
+            settingProvider, eventCollector, matchExecutor);
+        ITenantsStats tenantsState = new TenantsStats(rangeReaderProvider,
+            "clusterId", clusterId, "storeId", storeId, "rangeId", KVRangeIdUtil.toString(id));
+
+        IDeliverExecutorGroup deliverExecutorGroup = new DeliverExecutorGroup(
+            deliverer, eventCollector, resourceThrottler, settingProvider, fanoutParallelism, inlineFanOutThreshold);
+        return new DistWorkerCoProc(
+            id, rangeReaderProvider, routeCache, tenantsState, deliverExecutorGroup, subscriptionChecker);
+    }
+
+    public void close() {
+        MoreExecutors.shutdownAndAwaitTermination(matchExecutor, 5, TimeUnit.SECONDS);
+    }
+}

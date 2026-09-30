@@ -1,0 +1,208 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+
+import "commontype/ClientInfo.proto";
+import "commontype/InboxState.proto";
+import "commontype/QoS.proto";
+
+package sessiondict;
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.sessiondict.rpc.proto";
+option java_outer_classname = "SessionDictServiceProtos";
+option optimize_for = SPEED;
+
+service SessionDictService {
+  rpc dict (stream Session) returns (stream Quit);
+  rpc kill (KillRequest) returns(KillReply);
+  rpc killAll (KillAllRequest) returns(KillAllReply);
+  rpc get(GetRequest) returns(GetReply);
+  rpc exist(stream ExistRequest) returns(stream ExistReply);
+  rpc inboxState(GetInboxStateRequest) returns(GetInboxStateReply); // inbox state of transient session
+  rpc sub(SubRequest) returns(SubReply);
+  rpc unsub(UnsubRequest) returns(UnsubReply);
+}
+
+message Session {
+  uint64  reqId = 1;
+  commontype.ClientInfo owner = 2;
+  bool keep = 3;
+}
+
+message ServerRedirection{
+  enum Type{
+    NO_MOVE = 0;
+    PERMANENT_MOVE = 1;
+    TEMPORARY_MOVE = 2;
+  }
+  Type type = 1;
+  optional string serverReference = 2; // should be less than 65,535, valid for PERMANENT_MOVE and TEMPORARY_MOVE
+}
+
+message Quit {
+  uint64  reqId = 1;
+  commontype.ClientInfo owner = 2;
+  commontype.ClientInfo killer = 3;
+  ServerRedirection serverRedirection = 4;
+}
+
+message KillRequest {
+  uint64 reqId = 1;
+  string tenantId = 2;
+  string userId = 3;
+  string clientId = 4;
+  commontype.ClientInfo killer = 5;
+  ServerRedirection serverRedirection = 6;
+}
+
+message KillReply {
+  enum Result{
+    OK = 0;
+    ERROR = 1;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+}
+
+message KillAllRequest {
+  uint64 reqId = 1;
+  string tenantId = 2;
+  optional string userId = 3;
+  commontype.ClientInfo killer = 4;
+  ServerRedirection serverRedirection = 5;
+}
+
+message KillAllReply {
+  enum Result{
+    OK = 0;
+    ERROR = 1;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+}
+
+message GetRequest {
+  uint64 reqId = 1;
+  string tenantId = 2;
+  string userId = 3;
+  string clientId = 4;
+}
+
+message GetReply {
+  enum Result{
+    OK = 0;
+    NOT_FOUND = 1;
+    ERROR = 2;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+  commontype.ClientInfo owner = 3;
+}
+
+message ExistRequest {
+  message Client{
+    string userId = 1;
+    string clientId = 2;
+  }
+  uint64 reqId = 1;
+  repeated Client client = 2;
+}
+
+message ExistReply {
+  enum Code{
+    OK = 0;
+    ERROR = 1;
+  }
+  uint64 reqId = 1;
+  Code code = 2;
+  repeated bool exist = 3;
+}
+
+message GetInboxStateRequest {
+  uint64 reqId = 1;
+  string tenantId = 2;
+  string userId = 3;
+  string clientId = 4;
+}
+
+message GetInboxStateReply {
+  enum Code{
+    OK = 0;
+    NO_INBOX = 1;
+    TRY_LATER = 2;
+    BACK_PRESSURE_REJECTED = 3;
+    ERROR = 4;
+  }
+  uint64 reqId = 1;
+  Code code = 2;
+  optional commontype.InboxState state = 3; // available when code = OK
+}
+
+message SubRequest {
+  uint64 reqId = 1;
+  string tenantId = 2;
+  string userId = 3;
+  string clientId = 4;
+  string topicFilter = 5;
+  commontype.QoS qos = 6;
+}
+
+message SubReply {
+  enum Result{
+    OK = 0;
+    EXISTS = 1;
+    NO_SESSION = 2;
+    EXCEED_LIMIT = 3;
+    NOT_AUTHORIZED = 4;
+    TOPIC_FILTER_INVALID = 5;
+    WILDCARD_NOT_SUPPORTED = 6;
+    SHARED_SUBSCRIPTION_NOT_SUPPORTED = 7;
+    SUBSCRIPTION_IDENTIFIER_NOT_SUPPORTED = 8;
+    BACK_PRESSURE_REJECTED = 9;
+    TRY_LATER = 10;
+    ERROR = 11;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+}
+
+message UnsubRequest {
+  uint64 reqId = 1;
+  string tenantId = 2;
+  string userId = 3;
+  string clientId = 4;
+  string topicFilter = 5;
+}
+
+message UnsubReply {
+  enum Result {
+    OK = 0;
+    NO_SUB = 1;
+    NO_SESSION = 2;
+    NOT_AUTHORIZED = 3;
+    TOPIC_FILTER_INVALID = 4;
+    BACK_PRESSURE_REJECTED = 5;
+    TRY_LATER = 6;
+    ERROR = 7;
+  }
+
+  uint64 reqId = 1;
+  Result result = 2;
+}
