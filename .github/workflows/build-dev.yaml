@@ -1,0 +1,51 @@
+name: Build and Test BifroMQ
+
+on:
+  workflow_dispatch:
+jobs:
+  license:
+    name: "License Check"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+    - name: Check License Header
+      uses: 
+        apache/skywalking-eyes/header@6e368ec14f31521edc7118374773e78d2d646aeb
+    - name: Install without tests
+      run: ./mvnw -q -DskipTests install
+    - name: Check Dependencies' License
+      uses: 
+        apache/skywalking-eyes/dependency@6e368ec14f31521edc7118374773e78d2d646aeb
+      env:
+        MAVEN_OPTS: -Xmx1g
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    name: "Build BifroMQ"
+    needs: license
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, windows-11-arm]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v5
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+          # JDK 17 and the rocksdbjni natives have no Windows arm64 build: use the x64 ones under emulation
+        architecture: ${{ matrix.os == 'windows-11-arm' && 'x64' || '' }}
+        cache: maven
+    - name: Install TestSuites
+      run: mvn install -pl testsuites -am
+    - name: Build with Maven
+      run: mvn clean verify -P build
+    timeout-minutes: 150
