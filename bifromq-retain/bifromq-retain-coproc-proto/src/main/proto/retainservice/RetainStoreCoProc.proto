@@ -1,0 +1,126 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+import "commontype/ClientInfo.proto";
+import "commontype/TopicMessage.proto";
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.retain.rpc.proto";
+option java_outer_classname = "RetainCoProcProtos";
+
+package retainservice;
+
+message RetainSetMetadata{
+  uint64 count = 1;
+  uint64 usedSpace = 2;
+  uint64 estExpire = 3;
+}
+
+message RetainMessage{
+  commontype.Message message = 1;
+  commontype.ClientInfo publisher = 2;
+}
+
+message RetainParam{
+  map<string, RetainMessage> topicMessages = 1; // key: topic
+}
+
+message BatchRetainRequest{
+  uint64 reqId = 1;
+  map<string, RetainParam> params = 2; // key: tenantId
+}
+
+message RetainResult{
+  enum Code {
+    RETAINED = 0;
+    CLEARED = 1;
+  }
+  map<string, Code> results = 1; // key: topic
+}
+
+message BatchRetainReply{
+  uint64 reqId = 1;
+  map<string, RetainResult> results = 2;
+}
+
+message MatchParam{
+  map<string, uint32> topicFilters = 1; // key: topicFilters value: limit
+  uint64 now = 2;
+}
+
+message BatchMatchRequest{
+  uint64 reqId = 1;
+  map<string, MatchParam> matchParams = 2; // key: tenantId
+}
+
+message MatchError{
+
+}
+
+message MatchResult{
+  repeated commontype.TopicMessage messages = 1;
+}
+
+message MatchResultPack{
+  map<string, MatchResult> results = 1; // key: topic filter
+}
+
+message BatchMatchReply{
+  uint64 reqId = 1;
+  map<string, MatchResultPack> resultPack = 2;// key: tenantId
+}
+
+message GCRequest {
+  uint64 reqId = 1;
+  uint64 now = 2;
+  optional string tenantId = 3; // if specified then will only gc the messages of this tenant
+  optional uint32 expirySeconds = 4; // if specified then will using this value to determine the expire time for each messages
+}
+
+message GCReply {
+  uint64 reqId = 1;
+}
+
+message RetainServiceRWCoProcInput{
+  oneof type{
+    BatchRetainRequest batchRetain = 1;
+    GCRequest gc = 2;
+  }
+}
+
+message RetainServiceRWCoProcOutput{
+  oneof type{
+    BatchRetainReply batchRetain = 1;
+    GCReply gc = 2;
+  }
+}
+
+message RetainServiceROCoProcInput{
+  oneof type{
+    BatchMatchRequest batchMatch = 1;
+  }
+}
+
+message RetainServiceROCoProcOutput{
+  oneof type{
+    BatchMatchReply batchMatch = 1;
+  }
+}
+
+

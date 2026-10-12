@@ -1,0 +1,202 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+
+import "basekv/Descriptor.proto";
+import "basekv/Type.proto";
+import "basekv/Command.proto";
+import "basekv/CoProc.proto";
+package basekv;
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.basekv.store.proto";
+option optimize_for = SPEED;
+
+service BaseKVStoreService{
+  rpc bootstrap(BootstrapRequest) returns (BootstrapReply);
+  rpc recover(RecoverRequest) returns(RecoverReply);
+  rpc zombieQuit(ZombieQuitRequest) returns(ZombieQuitReply);
+  rpc transferLeadership(TransferLeadershipRequest) returns (TransferLeadershipReply);
+  rpc changeReplicaConfig(ChangeReplicaConfigRequest) returns (ChangeReplicaConfigReply);
+  rpc split(KVRangeSplitRequest) returns (KVRangeSplitReply);
+  rpc merge(KVRangeMergeRequest) returns (KVRangeMergeReply);
+  rpc execute(stream KVRangeRWRequest)  returns (stream KVRangeRWReply);
+  rpc query(stream KVRangeRORequest)  returns (stream KVRangeROReply);
+  rpc linearizedQuery(stream KVRangeRORequest)  returns (stream KVRangeROReply);
+}
+
+message DescribeRequest{
+}
+
+message BootstrapRequest{
+  uint64 reqId = 1;
+  basekv.KVRangeId kvRangeId = 2;
+  Boundary boundary = 3;
+}
+
+message BootstrapReply{
+  enum Result{
+    Ok = 0;
+    Exists = 1;
+    Error = 2;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+}
+
+message RecoverRequest{
+  uint64 reqId = 1;
+  basekv.KVRangeId kvRangeId = 2;
+}
+
+message RecoverReply{
+  enum Result {
+    Ok = 0;
+    NotFound = 1;
+    Error = 2;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+}
+
+message ZombieQuitRequest{
+  uint64 reqId = 1;
+  basekv.KVRangeId kvRangeId = 2;
+}
+
+message ZombieQuitReply{
+  enum Result {
+    Ok = 0;
+    NotFound = 1;
+    Error = 2;
+  }
+  uint64 reqId = 1;
+  Result result = 2;
+  bool quit = 3;
+}
+
+enum ReplyCode{
+  Ok = 0;
+  BadVersion = 1;
+  TryLater = 2;
+  BadRequest = 3;
+  InternalError = 4;
+}
+
+message TransferLeadershipRequest{
+  uint64 reqId = 1;
+  uint64 ver = 2;
+  basekv.KVRangeId kvRangeId = 3;
+  string newLeaderStore = 4;
+}
+
+message TransferLeadershipReply{
+  uint64 reqId = 1;
+  ReplyCode code = 2;
+  optional KVRangeDescriptor latest = 3;
+}
+
+message ChangeReplicaConfigRequest{
+  uint64 reqId = 1;
+  uint64 ver = 2;
+  basekv.KVRangeId kvRangeId = 3;
+  repeated string newVoters = 4;
+  repeated string newLearners = 5;
+}
+
+message ChangeReplicaConfigReply{
+  uint64 reqId = 1;
+  ReplyCode code = 2;
+  optional KVRangeDescriptor latest = 3;
+}
+
+message KVRangeSplitRequest{
+  uint64 reqId = 1;
+  uint64 ver = 2;
+  basekv.KVRangeId kvRangeId = 3;
+  bytes splitKey = 4;
+}
+
+message KVRangeSplitReply{
+  uint64 reqId = 1;
+  ReplyCode code = 2;
+  optional KVRangeDescriptor latest = 3;
+}
+
+message KVRangeMergeRequest{
+  uint64 reqId = 1;
+  uint64 ver = 2;
+  basekv.KVRangeId mergerId = 3;
+  basekv.KVRangeId mergeeId = 4;
+  repeated string mergeeVoters = 5; // the mergee voters to contact to trigger the merge workflow
+}
+
+message KVRangeMergeReply{
+  uint64 reqId = 1;
+  ReplyCode code = 2;
+  optional KVRangeDescriptor latest = 3;
+}
+
+message KVRangeRWRequest{
+  uint64 reqId = 1;
+  uint64 ver = 2;
+  basekv.KVRangeId kvRangeId = 3;
+  oneof RequestType{
+    bytes delete = 4;
+    Put put = 5;
+    basekv.RWCoProcInput rwCoProc = 6;
+  }
+}
+
+message KVRangeRWReply{
+  uint64 reqId = 1;
+  ReplyCode code = 2;
+  oneof ReplyType{// only available when Code == Ok
+    bytes deleteResult = 3;
+    bytes putResult = 4;
+    basekv.RWCoProcOutput rwCoProcResult = 5;
+  }
+  optional KVRangeDescriptor latest = 6;
+}
+
+message KVRangeRORequest{
+  uint64 reqId = 1;
+  uint64 ver = 2;
+  basekv.KVRangeId kvRangeId = 3;
+  oneof Type{
+    bytes existKey = 4;
+    bytes getKey = 5;
+    basekv.ROCoProcInput roCoProc = 6;
+  }
+}
+
+message NullableValue{
+  optional bytes value = 1;
+}
+
+message KVRangeROReply{
+  uint64 reqId = 1;
+  ReplyCode code = 2;
+  oneof ReplyType{// only available when Code == Ok
+    bool existResult = 3;
+    NullableValue getResult = 4;
+    basekv.ROCoProcOutput roCoProcResult = 5;
+  }
+  optional KVRangeDescriptor latest = 6;
+}

@@ -1,0 +1,95 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+import "commontype/MatchInfo.proto";
+import "commontype/TopicMessage.proto";
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.plugin.subbroker";;
+option java_outer_classname = "SubBrokerProtos";
+
+package subbroker;
+
+message DeliveryPack{
+  commontype.TopicMessagePack messagePack = 2;
+  repeated commontype.MatchInfo matchInfo = 3;
+}
+
+message DeliveryPackage{
+  repeated DeliveryPack pack = 1;
+}
+
+message DeliveryRequest{
+  map<string, DeliveryPackage> package = 3; // key: tenantId
+}
+
+message DeliveryResult{
+  enum Code{
+    OK = 0;
+    NO_SUB = 1;
+    NO_RECEIVER = 2;
+  }
+  commontype.MatchInfo matchInfo = 1;
+  Code code = 2;
+}
+
+message DeliveryResults{
+  repeated DeliveryResult result = 1;
+}
+
+message DeliveryReply{
+  enum Code{
+    OK = 0;
+    BACK_PRESSURE_REJECTED = 1;
+    ERROR = 2;
+  }
+  Code code = 1;
+  map<string, DeliveryResults> result = 2; // key: tenantId
+}
+
+message MatchInfos{
+  repeated commontype.MatchInfo matchInfo = 1;
+}
+
+message MatchInfoCheckResults{
+  enum Code{
+    OK = 0;
+    NO_SUB = 1;
+    NO_RECEIVER = 2;
+    ERROR = 3;
+  }
+  repeated commontype.MatchInfo matchInfo = 1;
+  repeated Code code = 2;
+}
+
+message CheckRequest{
+  string tenantId = 1;
+  string delivererKey = 2;
+  repeated commontype.MatchInfo matchInfo = 3;
+}
+
+message CheckReply{
+  enum Code{
+    OK = 0;
+    NO_SUB = 1;
+    NO_RECEIVER = 2;
+    TRY_LATER = 3;
+    ERROR = 4;
+  }
+  repeated Code code = 1;
+}

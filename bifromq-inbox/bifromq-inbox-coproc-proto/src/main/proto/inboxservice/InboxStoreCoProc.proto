@@ -1,0 +1,391 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+import "commontype/ClientInfo.proto";
+import "commontype/InboxState.proto";
+import "commontype/TopicFilterOption.proto";
+import "commontype/TopicMessage.proto";
+import "inboxservice/LWT.proto";
+import "inboxservice/InboxFetched.proto";
+
+option java_multiple_files = true;
+option java_package = "org.apache.bifromq.inbox.storage.proto";
+option java_outer_classname = "InboxCoProcProtos";
+
+package inboxservice;
+
+message BatchFetchInboxStateRequest{
+  message Params{
+    string tenantId = 1;
+    string inboxId = 2;
+    uint64 now = 3;
+  }
+  repeated Params params = 1;
+}
+
+message BatchFetchInboxStateReply{
+  message Result{
+    enum Code{
+      OK = 0;
+      NO_INBOX = 1;
+      EXPIRED = 2;
+    }
+    Code code = 1;
+    optional commontype.InboxState state = 2; // when code is OK
+  }
+  repeated Result result = 1;
+}
+
+message BatchExistRequest{
+  message Params{
+    string tenantId = 1;
+    string inboxId = 2;
+    uint64 now = 3;
+  }
+  repeated Params params = 1;
+}
+
+message BatchExistReply{
+  repeated bool exist = 1;
+}
+
+message BatchCheckSubRequest{
+  message Params{
+    string tenantId = 1;
+    string inboxId = 2;
+    uint64 incarnation = 3;
+    string topicFilter = 4;
+  }
+  repeated Params params = 1;
+  uint64 now = 2;
+}
+
+message BatchCheckSubReply{
+  enum Code{
+    OK = 0;
+    NO_INBOX = 1;
+    NO_MATCH = 2;
+  }
+  repeated Code code = 1;
+}
+
+message BatchAttachRequest{
+  message Params {
+    string inboxId = 1;
+    uint64 incarnation = 2; // won't change when reuse existing inbox
+    uint32 expirySeconds = 3;
+    uint32 limit = 4; // won't change when reuse existing inbox
+    bool dropOldest = 5; // only work for qos0
+    optional LWT lwt = 6;
+    commontype.ClientInfo client = 7; // the attached client
+    uint64 now = 8;
+  }
+  repeated Params params = 1;
+}
+
+message InboxVersion{
+  uint64 incarnation = 1; // incarnation helps tracking the lifecycle of a inbox
+  uint64 mod = 2; // mod helps detects conflict within a incarnation
+}
+
+message BatchAttachReply{
+  repeated InboxVersion version = 1;
+}
+
+message BatchDetachRequest{
+  message Params {
+    string tenantId = 1;
+    string inboxId = 2;
+    optional InboxVersion version = 3; // if not set, the latest incarnation will be detached
+    uint32 expirySeconds = 4;
+    bool discardLWT = 5;
+    uint64 now = 6;
+  }
+  repeated Params params = 1;
+}
+
+message BatchDetachReply{
+  enum Code{
+    OK = 0;
+    NO_INBOX = 1;
+    CONFLICT = 2;
+  }
+  repeated Code code = 1;
+}
+
+message BatchDeleteRequest{
+  message Params{
+    string tenantId = 1;
+    string inboxId = 2;
+    InboxVersion version = 3;
+  }
+  repeated Params params = 1;
+}
+
+message BatchDeleteReply{
+  enum Code{
+    OK = 0;
+    NO_INBOX = 1;
+    CONFLICT = 2;
+  }
+  message Result{
+    Code code = 1;
+    map<string, commontype.TopicFilterOption> topicFilters = 2;
+  }
+  repeated Result result = 1;
+}
+
+message BatchSubRequest{
+  message Params{
+    string tenantId = 1;
+    string inboxId = 2;
+    InboxVersion version = 3;
+    string topicFilter = 5;
+    commontype.TopicFilterOption option = 6;
+    uint32  maxTopicFilters = 7;
+    uint64 now = 8;
+  }
+  repeated Params params = 1;
+}
+
+message BatchSubReply{
+  enum Code{
+    OK = 0;
+    EXISTS = 1;
+    EXCEED_LIMIT = 2;
+    NO_INBOX = 3;
+    CONFLICT = 4;
+  }
+  repeated Code code = 1;
+}
+
+message BatchUnsubRequest{
+  message Params{
+    string tenantId = 1;
+    string inboxId = 2;
+    InboxVersion version = 3;
+    string topicFilter = 4;
+    uint64 now = 5;
+  }
+  repeated Params params = 1;
+}
+
+message BatchUnsubReply{
+  enum Code{
+    OK = 0;
+    NO_INBOX = 1;
+    NO_SUB = 2;
+    CONFLICT = 3;
+  }
+  message Result{
+    Code code = 1;
+    optional commontype.TopicFilterOption option = 2; // when code is OK
+  }
+  repeated Result result = 1;
+}
+
+message BatchFetchRequest{
+  message Params{
+    string tenantId = 1;
+    string inboxId = 2;
+    uint64 incarnation = 3;
+    uint32 maxFetch = 4;
+    optional uint64 qos0StartAfter = 5;
+    optional uint64 sendBufferStartAfter = 6;
+  }
+  repeated Params params = 1;
+}
+
+message BatchFetchReply{
+  repeated Fetched result = 1;
+}
+
+message MatchedRoute{
+  string topicFilter = 1; // the matched topic filter
+  uint64 incarnation = 2; // route incarnation
+}
+// insert won't change version & lastActive timestamp
+message SubMessagePack{
+  repeated MatchedRoute matchedRoute = 1;
+  commontype.TopicMessagePack messages = 2;
+}
+
+message InsertRequest{
+  string tenantId = 1;
+  string inboxId = 2;
+  uint64 incarnation = 3;
+  repeated SubMessagePack messagePack = 4;
+}
+
+message BatchInsertRequest{
+  message SubRef{
+    repeated MatchedRoute matchedRoute = 1;
+    uint32 messagePackIndex = 2;
+  }
+
+  message InsertRef{
+    string tenantId = 1;
+    string inboxId = 2;
+    uint64 incarnation = 3;
+    repeated SubRef subRef = 4;
+  }
+
+  // legacy non-compact format: will be removed in next major version
+  repeated InsertRequest request = 1;
+  // new compact format
+  repeated commontype.TopicMessagePack topicMessagePack = 2;
+  repeated InsertRef insertRef = 3;
+}
+
+message InsertResult{
+  enum Code{
+    OK = 0;
+    NO_INBOX = 1;
+  }
+  message SubStatus{
+    MatchedRoute matchedRoute = 1;
+    bool rejected = 2; // true if the route is outdated
+  }
+  Code code = 1;
+  repeated SubStatus result = 2;
+}
+
+message BatchInsertReply{
+  repeated InsertResult result = 2; // same order as requests when code is OK
+}
+
+message BatchCommitRequest{
+  message Params{
+    string tenantId = 1;
+    string inboxId = 2;
+    InboxVersion version = 3;
+    optional uint64 qos0UpToSeq = 4;
+    optional uint64 sendBufferUpToSeq = 5;
+    uint64 now = 6;
+  }
+  repeated Params params = 1;
+}
+
+message BatchCommitReply{
+  enum Code{
+    OK = 0;
+    NO_INBOX = 1;
+    CONFLICT = 2;
+  }
+  repeated Code code = 1;
+}
+
+message BatchSendLWTRequest{
+  message Params{
+    string tenantId = 1;
+    string inboxId = 2;
+    InboxVersion version = 3;
+    uint64 now = 4;
+  }
+  repeated Params params = 1;
+}
+
+message BatchSendLWTReply{
+  enum Code{
+    OK = 0;
+    NO_INBOX = 1;
+    CONFLICT = 2;
+    TRY_LATER = 3;
+    ERROR = 4;
+  }
+  repeated Code code = 1;
+}
+
+message ExpireTenantRequest{
+  string tenantId = 1;
+  uint32 expirySeconds = 2;
+  uint64 now = 3;
+}
+
+message ExpireTenantReply{
+}
+
+message GCRequest {
+  uint64 now = 1;
+  optional bytes startKey = 2;
+  uint32 scanQuota = 3;
+}
+
+message GCReply {
+  // next start key for the following round
+  optional bytes nextStartKey = 1;
+  // number of metadata keys inspected in this round
+  uint32 inspectedCount = 2;
+  // number of successfully scheduled removals in this round
+  uint32 removeSuccess = 3;
+  // whether wrapped to range start in this round
+  bool wrapped = 4;
+}
+
+message InboxServiceRWCoProcInput{
+  uint64 reqId = 1;
+  oneof type{
+    BatchAttachRequest batchAttach = 2;
+    BatchDetachRequest batchDetach = 3;
+    BatchDeleteRequest batchDelete = 4;
+    BatchSubRequest batchSub = 5;
+    BatchUnsubRequest batchUnsub = 6;
+    BatchInsertRequest batchInsert = 7;
+    BatchCommitRequest batchCommit = 8;
+  }
+}
+
+message InboxServiceRWCoProcOutput{
+  uint64 reqId = 1;
+  oneof type{
+    BatchAttachReply batchAttach = 2;
+    BatchDetachReply batchDetach = 3;
+    BatchDeleteReply batchDelete = 4;
+    BatchSubReply batchSub = 5;
+    BatchUnsubReply batchUnsub = 6;
+    BatchInsertReply batchInsert = 7;
+    BatchCommitReply batchCommit = 8;
+  }
+}
+
+message InboxServiceROCoProcInput{
+  uint64 reqId = 1;
+  oneof input{
+    BatchExistRequest batchExist = 2;
+    BatchFetchRequest batchFetch = 3;
+    BatchCheckSubRequest batchCheckSub = 4;
+    BatchSendLWTRequest batchSendLWT = 5;
+    ExpireTenantRequest expireTenant = 6;
+    GCRequest gc = 7;
+    BatchFetchInboxStateRequest fetchInboxState = 8;
+  }
+}
+
+message InboxServiceROCoProcOutput{
+  uint64 reqId = 1;
+  oneof output{
+    BatchExistReply batchExist = 2;
+    BatchFetchReply batchFetch = 3;
+    BatchCheckSubReply batchCheckSub = 4;
+    BatchSendLWTReply batchSendLWT = 5;
+    ExpireTenantReply expireTenant = 6;
+    GCReply gc = 7;
+    BatchFetchInboxStateReply fetchInboxState = 8;
+  }
+}
